@@ -1687,12 +1687,25 @@ impl Session {
         }
     }
 
+    /// Converts `cwd` (a working directory reported for this session) into a path the host OS
+    /// can open, or `None` when it cannot be resolved.
+    ///
+    /// Prefer this over [`ShellLaunchData::maybe_convert_absolute_path`] for session working
+    /// directories. Launch data only describes the shell *Warp* spawned, so it is `None` for a
+    /// subshell and still names the parent Windows shell when the user typed `wsl` themselves.
+    /// This keys off the WSL distribution reported at bootstrap instead, so a `wsl` subshell
+    /// resolves to its `\\wsl$\<distro>\...` UNC path just like a WSL tab launched from the
+    /// shell selector.
+    pub fn convert_cwd_to_native_path(&self, cwd: &str) -> Option<PathBuf> {
+        let typed_path = self.convert_directory_to_typed_path_buf(cwd.to_string());
+        self.maybe_convert_to_native_path(&typed_path.to_path())
+            .ok()
+    }
+
     /// Returns whether `cwd` (a working directory reported for this session)
     /// can be resolved to a usable native path.
     pub fn can_resolve_cwd_to_native_path(&self, cwd: &str) -> bool {
-        let typed_path = self.convert_directory_to_typed_path_buf(cwd.to_string());
-        self.maybe_convert_to_native_path(&typed_path.to_path())
-            .is_ok()
+        self.convert_cwd_to_native_path(cwd).is_some()
     }
 }
 
@@ -1831,6 +1844,11 @@ pub mod testing {
             environment_variable_names: HashSet<SmolStr>,
         ) -> Self {
             self.environment_variable_names = environment_variable_names;
+            self
+        }
+
+        pub fn with_wsl_name(mut self, wsl_name: Option<String>) -> Self {
+            self.wsl_name = wsl_name;
             self
         }
 
