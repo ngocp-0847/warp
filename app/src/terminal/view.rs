@@ -7976,11 +7976,7 @@ impl TerminalView {
                         .and_then(|active_session_id| {
                             self.sessions.as_ref(ctx).get(active_session_id)
                         })
-                        .and_then(|active_session| {
-                            active_session
-                                .launch_data()
-                                .and_then(|data| data.maybe_convert_absolute_path(cwd))
-                        })
+                        .and_then(|active_session| active_session.convert_cwd_to_native_path(cwd))
                 })
                 // Checking if the pwd from the active session actually exists
                 // and if not (ie. directory was removed) - return None.
@@ -11762,9 +11758,7 @@ impl TerminalView {
                                 .session_id()
                                 .and_then(|sid| self.sessions.as_ref(ctx).get(sid))
                                 .and_then(|session| {
-                                    session.launch_data().and_then(|data| {
-                                        data.maybe_convert_absolute_path(active_directory)
-                                    })
+                                    session.convert_cwd_to_native_path(active_directory)
                                 })
                                 .map(|path| path.to_string_lossy().into_owned())
                                 .unwrap_or_else(|| active_directory.to_string())
@@ -23997,8 +23991,7 @@ impl TerminalView {
         if self.session_is_local(session_id, ctx) {
             // Local session: canonicalize to resolve symlinks / normalize.
             let path = session
-                .launch_data()
-                .and_then(|data| data.maybe_convert_absolute_path(cwd_str))
+                .convert_cwd_to_native_path(cwd_str)
                 .unwrap_or_else(|| PathBuf::from(cwd_str));
             let canonical = dunce::canonicalize(&path).ok()?;
             Some(LocalOrRemotePath::Local(canonical))

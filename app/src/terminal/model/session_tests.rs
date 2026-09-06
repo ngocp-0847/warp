@@ -143,6 +143,41 @@ fn can_resolve_cwd_to_native_path_accepts_windows_drive_path() {
     assert!(session.can_resolve_cwd_to_native_path(r"E:\CLAUDE-BASE"));
 }
 
+/// A session the user entered by typing `wsl` in a Windows shell carries no launch data — the
+/// distribution is only known from the bootstrap payload — so its CWD has to be resolved from
+/// `wsl_name`. Without that, the Project Explorer keeps showing the Windows tree of the parent
+/// shell instead of the tree inside the distribution.
+#[cfg(windows)]
+#[test]
+fn convert_cwd_to_native_path_maps_wsl_subshell_cwd_to_unc_path() {
+    let session_info = SessionInfo::new_for_test()
+        .with_shell_type(crate::terminal::shell::ShellType::Bash)
+        .with_wsl_name(Some("Ubuntu".to_owned()));
+    let session = Session::new(session_info, Arc::new(TestCommandExecutor::default()));
+
+    assert!(session.launch_data().is_none());
+    assert_eq!(
+        session.convert_cwd_to_native_path("/home/dev/project"),
+        Some(std::path::PathBuf::from(r"\\WSL$\Ubuntu\home\dev\project"))
+    );
+}
+
+/// A WSL CWD under `/mnt` names a Windows drive, so it resolves to that drive rather than to a
+/// UNC path into the distribution.
+#[cfg(windows)]
+#[test]
+fn convert_cwd_to_native_path_maps_wsl_mnt_cwd_to_windows_drive() {
+    let session_info = SessionInfo::new_for_test()
+        .with_shell_type(crate::terminal::shell::ShellType::Bash)
+        .with_wsl_name(Some("Ubuntu".to_owned()));
+    let session = Session::new(session_info, Arc::new(TestCommandExecutor::default()));
+
+    assert_eq!(
+        session.convert_cwd_to_native_path("/mnt/c/warp-wsl-cwd-test/project"),
+        Some(std::path::PathBuf::from(r"C:\warp-wsl-cwd-test\project"))
+    );
+}
+
 #[cfg(windows)]
 #[test]
 fn can_resolve_cwd_to_native_path_rejects_unix_encoded_path_on_windows() {
